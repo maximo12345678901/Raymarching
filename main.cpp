@@ -1,114 +1,46 @@
+// main.cpp
 #include "../vec.h"
 #include "../ui.h"
 #include <SFML/Graphics.hpp>
-#include <SFML/Graphics/BlendMode.hpp>
 #include <cmath>
-#include <omp.h>
-#include <variant>
-#include <array>
-#include <algorithm>
-#include <limits>
 #include "SFML/Window/Keyboard.hpp"
 
-uint windowWidth = 1600;
-uint windowHeight = 900;
-float aspectRatio;
-int resolutionWidth = 320;
+uint windowWidth = 2000;
+uint windowHeight = 1000;
+int resolutionWidth = 2000;
 int resolutionHeight;
 float renderScale;
 
-struct Ray {
-    Vector3 position;
-    Vector3 direction;  
-
-    Ray(Vector3 pos_, Vector3 dir_) {
-        position = pos_;
-        direction = dir_;
-    }
-};
-
-float CircleSDF(Vector3 pos, float r) {
-    return Vector3::length(pos) - r;
-}
-
-float BoxSDF(Vector3 p, Vector3 b) {
-    Vector3 q = Vector3::abs(p) - b;
-    return Vector3::length(Vector3::max(q, 0.0)) + std::min(std::max(q.x, std::max(q.y, q.z)), 0.0);
-}
-
-float TorusSDF(Vector3 p, Vector2 t) {
-     Vector2 q(Vector3::length(Vector3(p.x, 0, p.z)) - t.x, p.y);
-    return Vector2::length(q) - t.y;
-}
-
-float BoxFrameSDF(Vector3 p, Vector3 b, float e) {
-    p = Vector3::abs(p) - b;
-    Vector3 q = Vector3::abs(p + Vector3(e, e, e)) - Vector3(e, e, e);
-    return std::min({
-        Vector3::length(Vector3::max(Vector3(p.x, q.y, q.z), 0.0)) + std::min(std::max(p.x, std::max(q.y, q.z)), 0.0),
-        Vector3::length(Vector3::max(Vector3(q.x, p.y, q.z), 0.0)) + std::min(std::max(q.x, std::max(p.y, q.z)), 0.0),
-        Vector3::length(Vector3::max(Vector3(q.x, q.y, p.z), 0.0)) + std::min(std::max(q.x, std::max(q.y, p.z)), 0.0)
-    })-0.1f;
-}
-
-float CapsuleSDF(Vector3 p, Vector3 a, Vector3 b, float r) {
-    Vector3 ab = b - a;
-    Vector3 ap = p - a;
-    double t = Vector3::dot(ap, ab) / Vector3::dot(ab, ab);
-    t = std::max(0.0, std::min(1.0, t));
-    Vector3 closest = a + ab * t;
-    return Vector3::length(p - closest) - r;
-}
-
-float CustomSDF(Vector3 p, Vector2 t) {
-    Vector2 q(Vector3::length(Vector3(p.z, 0, p.z)) - t.x, p.y);
-    return Vector2::length(q) - t.y;
-
-}
-
-
-float Scene(Vector3 p) {
-    auto pmod = [](double a, double b) { return std::fmod(std::fmod(a, b) + b, b); };
-
-    float dDiamond = BoxSDF(Vector3(0, 0, 0) - p, Vector3(1, 1, 1));
-    float dTorus = TorusSDF(Vector3(1, 0, 0) - p, Vector2(1.0, 0.5));
-    float dBoxFrame = BoxFrameSDF(Vector3(0, 2, 0) - p, Vector3(2, 1, 2.5), 0.1f);
-    return std::min(std::max({dDiamond, -dTorus}), dBoxFrame);
-}
-
-Vector3 Normal(Vector3 p, float e = 0.01f) {
-    return Vector3::normalize(Vector3(
-        Scene(Vector3(p.x+e, p.y, p.z)) - Scene(Vector3(p.x-e, p.y, p.z)),
-        Scene(Vector3(p.x, p.y+e, p.z)) - Scene(Vector3(p.x, p.y-e, p.z)),
-        Scene(Vector3(p.x, p.y, p.z+e)) - Scene(Vector3(p.x, p.y, p.z-e))
-    ));
-}
-
 int main() {
-    aspectRatio = (float) windowWidth / (float) windowHeight;
-    resolutionHeight = (float) resolutionWidth / aspectRatio;
-    renderScale = (float) windowWidth / (float) resolutionWidth;
-
-    sf::Image image(sf::Vector2u(resolutionWidth, resolutionHeight));
-    sf::Texture texture;
-    (void)texture.loadFromImage(image);
-    sf::Sprite sprite(texture);
-    sprite.setScale({renderScale, renderScale});
+    float aspectRatio = (float)windowWidth / (float)windowHeight;
+    resolutionHeight = (float)resolutionWidth / aspectRatio;
+    renderScale = (float)windowWidth / (float)resolutionWidth;
 
     Vector3 camPos(0.0, 0.0, -5.0);
     float moveSpeed = 0.1f;
     Vector2 camRot(0.0, 0.0);
     float turnSpeed = 0.05f;
-    float fov = M_PI/2.0f;
-    
+    float fov = M_PI / 2.0f;
+
     sf::RenderWindow window(sf::VideoMode({windowWidth, windowHeight}), "reymarc");
     window.setFramerateLimit(60);
+
+    sf::Shader shader;
+    if (!shader.loadFromFile("raymarch.frag", sf::Shader::Type::Fragment)) {
+        return -1;
+    }
+
+    sf::RenderTexture renderTexture(sf::Vector2u(resolutionWidth, resolutionHeight));
+
+    sf::RectangleShape quad(sf::Vector2f(resolutionWidth, resolutionHeight));
+
+    sf::Sprite sprite(renderTexture.getTexture());
+    sprite.setScale({renderScale, renderScale});
+
     while (window.isOpen()) {
-        while (const std::optional event = window.pollEvent())
-        {
-            if (event->is<sf::Event::Closed>()) {
+        while (const std::optional event = window.pollEvent()) {
+            if (event->is<sf::Event::Closed>())
                 window.close();
-            }
         }
 
         Vector3 forward = Vector3::getForward(camRot);
@@ -116,13 +48,12 @@ int main() {
         Vector3 right = Vector3::normalize(Vector3::cross(worldUp, forward));
         Vector3 up    = Vector3::normalize(Vector3::cross(forward, right));
 
-
         if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::W))
-            camPos += forward * moveSpeed; 
+            camPos += forward * moveSpeed;
         if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S))
             camPos -= forward * moveSpeed;
         if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::D))
-            camPos += right * moveSpeed; 
+            camPos += right * moveSpeed;
         if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::A))
             camPos -= right * moveSpeed;
         if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Space))
@@ -139,66 +70,26 @@ int main() {
         if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Down))
             camRot.x += turnSpeed;
 
-        if (camRot.x <= -M_PI / 2.0f) {
+        if (camRot.x <= -M_PI / 2.0f)
             camRot.x = -M_PI / 2.0f + 0.01f;
-        }
-        else if (camRot.x >= M_PI / 2.0f) {
+        else if (camRot.x >= M_PI / 2.0f)
             camRot.x = M_PI / 2.0f - 0.01f;
-        }
 
         std::cout << "\033[2J";
         camPos.say();
         camRot.say();
 
-        float halfFovTan = std::tan(fov / 2.0f);
+        shader.setUniform("uResolution", sf::Glsl::Vec2(resolutionWidth, resolutionHeight));
+        shader.setUniform("uCamPos",     sf::Glsl::Vec3(camPos.x, camPos.y, camPos.z));
+        shader.setUniform("uForward",    sf::Glsl::Vec3(forward.x, forward.y, forward.z));
+        shader.setUniform("uRight",      sf::Glsl::Vec3(right.x, right.y, right.z));
+        shader.setUniform("uUp",         sf::Glsl::Vec3(up.x, up.y, up.z));
+        shader.setUniform("uFov",        fov);
 
-        #pragma omp parallel for collapse(2)
-        for (unsigned x = 0; x < resolutionWidth; ++x) {
-            for (unsigned y = 0; y < resolutionHeight; ++y) {
+        renderTexture.clear();
+        renderTexture.draw(quad, &shader);
+        renderTexture.display();
 
-                float ndcX =  (x + 0.5f) / resolutionWidth  * 2.0f - 1.0f;
-                float ndcY = -((y + 0.5f) / resolutionHeight * 2.0f - 1.0f);
-
-                Vector3 rayDir = Vector3::normalize(
-                    forward
-                    + right * (ndcX * halfFovTan * aspectRatio)
-                    + up    * (ndcY * halfFovTan)
-                );
-
-                Ray ray(camPos, rayDir);
-
-                sf::Color color = sf::Color::Black;
-                for (int i = 0; i < 100; i++) {
-                    float dist = Scene(ray.position);
-                    ray.position += ray.direction * dist;
-
-                    if (dist < 0.01f) {
-                        // float distFromCamera = Vector3::distance(camPos, ray.position);
-                        // float brightness = std::min(255.0f, 2000.0f / (distFromCamera + 0.1f));
-                        float brightness = (1 + Vector3::dot(Vector3(1, 1, 1).Normalized(), Normal(ray.position, 0.01f)))/2.0f * 255;
-                        color = sf::Color(brightness, brightness, brightness);
-
-                        ray.direction = Vector3(1, 1, 1).Normalized();
-                        ray.position += ray.direction * 0.02f;
-                        for (int j = 0; j < 30; j++) {
-                            float dist = Scene(ray.position);
-                            ray.position += ray.direction * dist;
-                            if (dist < 0.01f) {
-                                color = sf::Color(30, 30, 30);
-                                break;
-                            }
-                        }
-                        break;
-                    }
-                    if (dist > 50) {
-                        break;
-                    }
-                }
-                image.setPixel({x, y}, color);
-            }
-        }
-
-        (void)texture.loadFromImage(image);
         window.clear();
         window.draw(sprite);
         window.display();
