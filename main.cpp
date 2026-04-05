@@ -96,7 +96,7 @@ int main() {
     Vector3 camPos(0.0, 0.0, -5.0);
     float moveSpeed = 0.1f;
     Vector2 camRot(0.0, 0.0);
-    float turnSpeed = 0.1f;
+    float turnSpeed = 0.05f;
     float fov = M_PI/2.0f;
     
     sf::RenderWindow window(sf::VideoMode({windowWidth, windowHeight}), "reymarc");
@@ -109,14 +109,20 @@ int main() {
             }
         }
 
+        Vector3 forward = Vector3::getForward(camRot);
+        Vector3 worldUp(0.0, 1.0, 0.0);
+        Vector3 right = Vector3::normalize(Vector3::cross(worldUp, forward));
+        Vector3 up    = Vector3::normalize(Vector3::cross(forward, right));
+
+
         if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::W))
-            camPos += Vector3::getForward(camRot) * moveSpeed; 
+            camPos += forward * moveSpeed; 
         if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S))
-            camPos -= Vector3::getForward(camRot) * moveSpeed;
+            camPos -= forward * moveSpeed;
         if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::D))
-            camPos += Vector3::getForward(Vector2(camRot.x, camRot.y + M_PI / 2.0f)) * moveSpeed; 
+            camPos += right * moveSpeed; 
         if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::A))
-            camPos -= Vector3::getForward(Vector2(camRot.x, camRot.y + M_PI / 2.0f)) * moveSpeed;
+            camPos -= right * moveSpeed;
         if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Space))
             camPos.y += moveSpeed;
         if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::LShift))
@@ -142,11 +148,6 @@ int main() {
         camPos.say();
         camRot.say();
 
-        Vector3 forward = Vector3::getForward(camRot);
-        Vector3 worldUp(0.0, 1.0, 0.0);
-        Vector3 right = Vector3::normalize(Vector3::cross(worldUp, forward));
-        Vector3 up    = Vector3::normalize(Vector3::cross(forward, right));
-
         float halfFovTan = std::tan(fov / 2.0f);
 
         #pragma omp parallel for collapse(2)
@@ -165,7 +166,7 @@ int main() {
                 Ray ray(camPos, rayDir);
 
                 sf::Color color = sf::Color::Black;
-                for (int i = 0; i < 1000; i++) {
+                for (int i = 0; i < 100; i++) {
                     float dist = Scene(ray.position);
                     ray.position += ray.direction * dist;
 
