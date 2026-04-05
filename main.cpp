@@ -74,6 +74,14 @@ float Scene(Vector3 p) {
     return d;
 }
 
+Vector3 Normal(Vector3 p, float e = 0.01f) {
+    return Vector3::normalize(Vector3(
+        Scene(Vector3(p.x+e, p.y, p.z)) - Scene(Vector3(p.x-e, p.y, p.z)),
+        Scene(Vector3(p.x, p.y+e, p.z)) - Scene(Vector3(p.x, p.y-e, p.z)),
+        Scene(Vector3(p.x, p.y, p.z+e)) - Scene(Vector3(p.x, p.y, p.z-e))
+    ));
+}
+
 int main() {
     aspectRatio = (float) windowWidth / (float) windowHeight;
     resolutionHeight = (float) resolutionWidth / aspectRatio;
@@ -156,22 +164,23 @@ int main() {
 
                 Ray ray(camPos, rayDir);
 
-                sf::Color px = sf::Color::Black;
+                sf::Color color = sf::Color::Black;
                 for (int i = 0; i < 1000; i++) {
                     float dist = Scene(ray.position);
                     ray.position += ray.direction * dist;
 
                     if (dist < 0.01f) {
-                        float distFromCamera = Vector3::distance(camPos, ray.position);
-                        float color = std::min(255.0f, 2000.0f / (distFromCamera + 0.1f));
-                        px = sf::Color(color, color, color);
+                        // float distFromCamera = Vector3::distance(camPos, ray.position);
+                        // float brightness = std::min(255.0f, 2000.0f / (distFromCamera + 0.1f));
+                        float brightness = (1 + Vector3::dot(Vector3(1, 1, 1).Normalized(), Normal(ray.position)))/2.0f * 255;
+                        color = sf::Color(brightness, brightness, brightness);
                         break;
                     }
                     if (dist > 50) {
                         break;
                     }
                 }
-                image.setPixel({x, y}, px);
+                image.setPixel({x, y}, color);
             }
         }
 
