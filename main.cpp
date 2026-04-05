@@ -33,7 +33,7 @@ float CircleSDF(Vector3 pos, float r) {
 
 float BoxSDF(Vector3 p, Vector3 b) {
     Vector3 q = Vector3::abs(p) - b;
-    return Vector3::length(Vector3::max(q, 0.0)) + std::min(std::max(q.x, std::min(q.y, q.z)), 0.0);
+    return Vector3::length(Vector3::max(q, 0.0)) + std::min(std::max(q.x, std::max(q.y, q.z)), 0.0);
 }
 
 float TorusSDF(Vector3 p, Vector2 t) {
@@ -48,7 +48,7 @@ float BoxFrameSDF(Vector3 p, Vector3 b, float e) {
         Vector3::length(Vector3::max(Vector3(p.x, q.y, q.z), 0.0)) + std::min(std::max(p.x, std::max(q.y, q.z)), 0.0),
         Vector3::length(Vector3::max(Vector3(q.x, p.y, q.z), 0.0)) + std::min(std::max(q.x, std::max(p.y, q.z)), 0.0),
         Vector3::length(Vector3::max(Vector3(q.x, q.y, p.z), 0.0)) + std::min(std::max(q.x, std::max(q.y, p.z)), 0.0)
-    });
+    })-0.1f;
 }
 
 float CapsuleSDF(Vector3 p, Vector3 a, Vector3 b, float r) {
@@ -70,8 +70,10 @@ float CustomSDF(Vector3 p, Vector2 t) {
 float Scene(Vector3 p) {
     auto pmod = [](double a, double b) { return std::fmod(std::fmod(a, b) + b, b); };
 
-    float d = BoxSDF(Vector3(0, 0, 0) - p, Vector3(1, 1, 1));
-    return d;
+    float dDiamond = BoxSDF(Vector3(0, 0, 0) - p, Vector3(1, 1, 1));
+    float dTorus = TorusSDF(Vector3(1, 0, 0) - p, Vector2(1.0, 0.5));
+    float dBoxFrame = BoxFrameSDF(Vector3(0, 2, 0) - p, Vector3(2, 1, 2.5), 0.1f);
+    return std::min(std::max({dDiamond, -dTorus}), dBoxFrame);
 }
 
 Vector3 Normal(Vector3 p, float e = 0.01f) {
@@ -173,8 +175,19 @@ int main() {
                     if (dist < 0.01f) {
                         // float distFromCamera = Vector3::distance(camPos, ray.position);
                         // float brightness = std::min(255.0f, 2000.0f / (distFromCamera + 0.1f));
-                        float brightness = (1 + Vector3::dot(Vector3(1, 1, 1).Normalized(), Normal(ray.position)))/2.0f * 255;
+                        float brightness = (1 + Vector3::dot(Vector3(1, 1, 1).Normalized(), Normal(ray.position, 0.01f)))/2.0f * 255;
                         color = sf::Color(brightness, brightness, brightness);
+
+                        ray.direction = Vector3(1, 1, 1).Normalized();
+                        ray.position += ray.direction * 0.02f;
+                        for (int j = 0; j < 30; j++) {
+                            float dist = Scene(ray.position);
+                            ray.position += ray.direction * dist;
+                            if (dist < 0.01f) {
+                                color = sf::Color(30, 30, 30);
+                                break;
+                            }
+                        }
                         break;
                     }
                     if (dist > 50) {
