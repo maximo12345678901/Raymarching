@@ -7,7 +7,7 @@
 
 uint windowWidth = 2000;
 uint windowHeight = 1000;
-int resolutionWidth = 500;
+int resolutionWidth = 1000;
 int resolutionHeight;
 float renderScale;
 
@@ -22,14 +22,19 @@ int main() {
     float turnSpeed = 0.05f;
     float fov = M_PI / 2.0f;
 
-    double blendStrength = 1.0f;
+    double blendStrength = 1.0;
+    double mandelPower = 2.0;
+    double mandelIterations = 10.0;
     Background background(sf::Color(20, 20, 20), sf::Vector2f(10, 10), sf::Vector2f(500, 100));
+
     sf::Font font("font.tff");
-    Slider slider(
+    
+    // Blend strength slider
+    Slider blendSlider(
     blendStrength,
     0.0001, 10.0,
-    sf::Vector2f(10.f, 50.f), // start at (10,10)
-    490.f,                    // ends near x = 500
+    sf::Vector2f(10.f, 50.f),
+    490.f,
     sf::Color(100, 100, 100),
     sf::Color::White,
     4.f,
@@ -37,6 +42,34 @@ int main() {
     2,
     font,
     "Blend strength"
+    );
+    // Mandel power slider
+    Slider mandelPowerSlider(
+    mandelPower,
+    1.0, 4.0,
+    sf::Vector2f(10.f, 100.f),
+    490.f,
+    sf::Color(100, 100, 100),
+    sf::Color::White,
+    4.f,
+    8.f,
+    2,
+    font,
+    "Mandelbulb power"
+    );
+    // Mandel iterations slider;
+    Slider iterationSlider(
+    mandelIterations,
+    5.0, 200.0,
+    sf::Vector2f(10.f, 150.f),
+    490.f,
+    sf::Color(100, 100, 100),
+    sf::Color::White,
+    4.f,
+    8.f,
+    2,
+    font,
+    "Mandelbulb iterations"
     );
 
     bool isShowingUI = true;
@@ -59,7 +92,9 @@ int main() {
         while (const std::optional event = window.pollEvent()) {
             if (event->is<sf::Event::Closed>())
                 window.close();
-            slider.HandleEvent(*event, window);
+            blendSlider.HandleEvent(*event, window);
+            mandelPowerSlider.HandleEvent(*event, window);
+            iterationSlider.HandleEvent(*event, window);
         }
 
         Vector3 forward = Vector3::getForward(camRot);
@@ -105,6 +140,8 @@ int main() {
         shader.setUniform("uUp",         sf::Glsl::Vec3(up.x, up.y, up.z));
         shader.setUniform("uFov",        fov);
         shader.setUniform("uBlendStrength", static_cast<float>(blendStrength));
+        shader.setUniform("Iterations", static_cast<int>(mandelIterations));
+        shader.setUniform("Power", static_cast<float>(mandelPower));
 
         renderTexture.clear();
         renderTexture.draw(quad, &shader);
@@ -114,7 +151,9 @@ int main() {
         window.draw(sprite);
         if (isShowingUI) {
             background.Draw(window);
-            slider.Draw(window);
+            blendSlider.Draw(window);
+            mandelPowerSlider.Draw(window);
+            iterationSlider.Draw(window);
         }
         window.display();
     }

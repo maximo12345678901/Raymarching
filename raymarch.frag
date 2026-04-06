@@ -6,6 +6,9 @@ uniform vec3 uUp;
 uniform float uFov;
 uniform float uBlendStrength;
 
+uniform int Iterations;
+uniform float Power;
+
 float BoxSDF(vec3 p, vec3 b) {
     vec3 q = abs(p) - b;
     return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0);
@@ -32,6 +35,31 @@ float LinkSDF( vec3 p, float le, float r1, float r2 )
   return length(vec2(length(q.xy)-r1,q.z)) - r2;
 }
 
+float DE(vec3 pos) {
+	vec3 z = pos;
+	float dr = 1.0;
+	float r = 0.0;
+	for (int i = 0; i < Iterations ; i++) {
+		r = length(z);
+		if (r>4.0) break;
+		
+		// convert to polar coordinates
+		float theta = acos(z.z/r);
+		float phi = atan(z.y,z.x);
+		dr =  pow( r, Power-1.0)*Power*dr + 1.0;
+		
+		// scale and rotate the point
+		float zr = pow( r,Power);
+		theta = theta*Power;
+		phi = phi*Power;
+		
+		// convert back to cartesian coordinates
+		z = zr*vec3(sin(theta)*cos(phi), sin(phi)*sin(theta), cos(theta));
+		z+=pos;
+	}
+	return 0.5*log(r)*r/dr;
+}
+
 float pmod(float a, float b) {
     return mod(mod(a, b) + b, b);
 }
@@ -51,11 +79,11 @@ vec3 BendPos(vec3 pos, float k) {
 }
 
 float Scene(vec3 p) {
-    vec3 tp = vec3(pmod(p.x, 10.0), pmod(p.y, 10.0), pmod(p.z, 10.0)) - 5.0;
-    float dTorus    = TorusSDF(p, vec2(2.0, 1.0));
-    float dBoxFrame = BoxFrameSDF(p - vec3(5.0, 1.5, 5.0), vec3(2.0, 1.0, 2.5), 0.1);
-    float dLink = LinkSDF(vec3(p.x, pmod(p.y, 2.0), p.z), 2.0, 1.0, 0.5);
-    return SmoothMin(SmoothMin(dTorus, dBoxFrame, uBlendStrength), dLink, uBlendStrength);
+    // float dTorus    = TorusSDF(p, vec2(2.0, 1.0));
+    // float dBoxFrame = BoxFrameSDF(p - vec3(5.0, 1.5, 5.0), vec3(2.0, 1.0, 2.5), 0.1);
+    // float dLink = LinkSDF(vec3(p.x, pmod(p.y, 2.0), p.z), 2.0, 1.0, 0.5);
+    // return SmoothMin(SmoothMin(dTorus, dBoxFrame, uBlendStrength), dLink, uBlendStrength);
+    return DE(p);
 }
 
 vec3 Normal(vec3 p) {
