@@ -4,10 +4,12 @@ uniform vec3 uForward;
 uniform vec3 uRight;
 uniform vec3 uUp;
 uniform float uFov;
+uniform float uBlendStrength;
 
 float BoxSDF(vec3 p, vec3 b) {
     vec3 q = abs(p) - b;
-    return length(max(q, 0.0)) + min(min(q.x, max(q.y, q.z)), 0.0);
+    return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0);
+    // return length(max(q,0.0)) + min(max(q.x* q.y,min(q.y*q.z,q.z*q.x)),0.0);
 }
 
 float TorusSDF(vec3 p, vec2 t) {
@@ -21,14 +23,39 @@ float BoxFrameSDF(vec3 p, vec3 b, float e) {
     return min(min(
         length(max(vec3(p.x, q.y, q.z), 0.0)) + min(max(p.x, max(q.y, q.z)), 0.0),
         length(max(vec3(q.x, p.y, q.z), 0.0)) + min(max(q.x, max(p.y, q.z)), 0.0)),
-        length(max(vec3(q.x, q.y, p.z), 0.0)) + min(max(q.x, max(q.y, p.z)), 0.0)) - 0.1;
+        length(max(vec3(q.x, q.y, p.z), 0.0)) + min(max(q.x, max(q.y, p.z)), 0.0));
+}
+
+float LinkSDF( vec3 p, float le, float r1, float r2 )
+{
+  vec3 q = vec3( p.x, max(abs(p.y)-le,0.0), p.z );
+  return length(vec2(length(q.xy)-r1,q.z)) - r2;
+}
+
+float pmod(float a, float b) {
+    return mod(mod(a, b) + b, b);
+}
+
+float SmoothMin(float distA, float distB, float k) {
+    float h = max(k-abs(distA-distB), 0.0) / k;
+    return min(distA, distB) - h*h*h*k*1.0/6.0;
+}
+
+vec3 BendDir(vec3 dir, float k) {
+    float c = cos(k), s = sin(k);
+    return normalize(vec3(c*dir.x - s*dir.y, s*dir.x + c*dir.y, dir.z));
+}
+vec3 BendPos(vec3 pos, float k) {
+    float c = cos(k * pos.x), s = sin(k * pos.x);
+    return vec3(pos.x, c*pos.y - s*pos.z, s*pos.y + c*pos.z);
 }
 
 float Scene(vec3 p) {
-    float dDiamond  = BoxSDF(p, vec3(1.0, 2.0, 1.0));
-    float dTorus    = TorusSDF(p - vec3(1.0, 1.0, 0.0), vec2(1.0, 0.5));
-    float dBoxFrame = BoxFrameSDF(p - vec3(0.0, 2.0, 0.0), vec3(2.0, 1.0, 2.5), 0.1);
-    return min(max(dDiamond, -dTorus), dBoxFrame);
+    vec3 tp = vec3(pmod(p.x, 10.0), pmod(p.y, 10.0), pmod(p.z, 10.0)) - 5.0;
+    float dTorus    = TorusSDF(p, vec2(2.0, 1.0));
+    float dBoxFrame = BoxFrameSDF(p - vec3(5.0, 1.5, 5.0), vec3(2.0, 1.0, 2.5), 0.1);
+    float dLink = LinkSDF(vec3(p.x, pmod(p.y, 2.0), p.z), 2.0, 1.0, 0.5);
+    return SmoothMin(SmoothMin(dTorus, dBoxFrame, uBlendStrength), dLink, uBlendStrength);
 }
 
 vec3 Normal(vec3 p) {
@@ -57,8 +84,11 @@ void main() {
 
     vec4 color = vec4(0.0, 0.0, 0.0, 1.0);
 
-    for (int i = 0; i < 100; i++) {
+    // vec3 warpedRayDir = rayDir;
+
+    for (int i = 0; i < 50; i++) {
         float dist = Scene(rayPos);
+        // warpedRayDir = BendDir(warpedRayDir, 0.2);
         rayPos += rayDir * dist;
 
         if (dist < 0.01) {
@@ -67,7 +97,7 @@ void main() {
 
             vec3 shadowPos = rayPos + normal * 0.05;
             bool inShadow = false;
-            for (int j = 0; j < 30; j++) {
+            for (int j = 0; j < 300; j++) {
                 float shadowDist = Scene(shadowPos);
                 shadowPos += lightDir * shadowDist;
                 if (shadowDist < 0.01) {
@@ -77,13 +107,13 @@ void main() {
             }
 
             if (inShadow)
-                brightness *= 0.1;
+                brightness *= 0.4;
 
             color = vec4(brightness, brightness, brightness, 1.0);
             break;
         }
 
-        if (dist > 50.0) {
+        if (dist > 100.0) {
             if (dot(rayDir, lightDir) > 0.999)
                 color = vec4(1.0, 1.0, 0.0, 1.0);
             break;

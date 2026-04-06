@@ -7,7 +7,7 @@
 
 uint windowWidth = 2000;
 uint windowHeight = 1000;
-int resolutionWidth = 2000;
+int resolutionWidth = 500;
 int resolutionHeight;
 float renderScale;
 
@@ -22,6 +22,24 @@ int main() {
     float turnSpeed = 0.05f;
     float fov = M_PI / 2.0f;
 
+    double blendStrength = 1.0f;
+    Background background(sf::Color(20, 20, 20), sf::Vector2f(10, 10), sf::Vector2f(500, 100));
+    sf::Font font("font.tff");
+    Slider slider(
+    blendStrength,
+    0.0001, 10.0,
+    sf::Vector2f(10.f, 50.f), // start at (10,10)
+    490.f,                    // ends near x = 500
+    sf::Color(100, 100, 100),
+    sf::Color::White,
+    4.f,
+    8.f,
+    2,
+    font,
+    "Blend strength"
+    );
+
+    bool isShowingUI = true;
     sf::RenderWindow window(sf::VideoMode({windowWidth, windowHeight}), "reymarc");
     window.setFramerateLimit(60);
 
@@ -41,6 +59,7 @@ int main() {
         while (const std::optional event = window.pollEvent()) {
             if (event->is<sf::Event::Closed>())
                 window.close();
+            slider.HandleEvent(*event, window);
         }
 
         Vector3 forward = Vector3::getForward(camRot);
@@ -85,6 +104,7 @@ int main() {
         shader.setUniform("uRight",      sf::Glsl::Vec3(right.x, right.y, right.z));
         shader.setUniform("uUp",         sf::Glsl::Vec3(up.x, up.y, up.z));
         shader.setUniform("uFov",        fov);
+        shader.setUniform("uBlendStrength", static_cast<float>(blendStrength));
 
         renderTexture.clear();
         renderTexture.draw(quad, &shader);
@@ -92,6 +112,10 @@ int main() {
 
         window.clear();
         window.draw(sprite);
+        if (isShowingUI) {
+            background.Draw(window);
+            slider.Draw(window);
+        }
         window.display();
     }
     return 0;
