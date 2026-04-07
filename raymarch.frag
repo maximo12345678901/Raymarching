@@ -4,11 +4,16 @@ uniform vec3 uForward;
 uniform vec3 uRight;
 uniform vec3 uUp;
 uniform float uFov;
-uniform float uBlendStrength;
 
+uniform float uBlendStrength;
+uniform float GlowStrength;
 uniform int Iterations;
 uniform float Power;
+uniform float RayBendStrength;
 
+float SphereSDF(vec3 p, float r) {
+    return length(p) - r;
+}
 float BoxSDF(vec3 p, vec3 b) {
     vec3 q = abs(p) - b;
     return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0);
@@ -41,7 +46,7 @@ float DE(vec3 pos) {
 	float r = 0.0;
 	for (int i = 0; i < Iterations ; i++) {
 		r = length(z);
-		if (r>4.0) break;
+		if (r>8.0) break;
 		
 		// convert to polar coordinates
 		float theta = acos(z.z/r);
@@ -79,11 +84,12 @@ vec3 BendPos(vec3 pos, float k) {
 }
 
 float Scene(vec3 p) {
-    // float dTorus    = TorusSDF(p, vec2(2.0, 1.0));
-    // float dBoxFrame = BoxFrameSDF(p - vec3(5.0, 1.5, 5.0), vec3(2.0, 1.0, 2.5), 0.1);
+    float dTorus    = TorusSDF(p, vec2(2.0, 1.0));
+    float dBox = BoxSDF(p - vec3(5.0, 1.5, 5.0), vec3(2.0, 1.0, 2.5));
+    float dSphere = SphereSDF(p - vec3(2.5, 1.0, 4.0), 2.0);
     // float dLink = LinkSDF(vec3(p.x, pmod(p.y, 2.0), p.z), 2.0, 1.0, 0.5);
-    // return SmoothMin(SmoothMin(dTorus, dBoxFrame, uBlendStrength), dLink, uBlendStrength);
-    return DE(p);
+    return SmoothMin(SmoothMin(dTorus, dBox, uBlendStrength), dSphere, uBlendStrength);
+    // return DE(p);
 }
 
 vec3 Normal(vec3 p) {
@@ -112,30 +118,32 @@ void main() {
 
     vec4 color = vec4(0.0, 0.0, 0.0, 1.0);
 
-    // vec3 warpedRayDir = rayDir;
+    vec3 warpedRayDir = rayDir;
 
-    for (int i = 0; i < 50; i++) {
+    for (int i = 0; i < 300; i++) {
         float dist = Scene(rayPos);
-        // warpedRayDir = BendDir(warpedRayDir, 0.2);
+        rayDir = BendDir(rayDir, RayBendStrength);
         rayPos += rayDir * dist;
 
-        if (dist < 0.01) {
-            vec3 normal = Normal(rayPos);
-            float brightness = (1.0 + dot(lightDir, normal)) / 2.0;
+        // float brightness = 0.1;
+        // brightness += GlowStrength*brightness*(1.0-brightness);
 
-            vec3 shadowPos = rayPos + normal * 0.05;
-            bool inShadow = false;
-            for (int j = 0; j < 300; j++) {
+        if (dist < 0.001) {
+            vec3 normal = Normal(rayPos);
+            float brightness = ((dot(normal, lightDir) + 1.0) * 0.45) + 0.1;
+            vec3 shadowPos = rayPos + lightDir * 0.01;
+
+            for (int j = 0; j < 200; j++) {
                 float shadowDist = Scene(shadowPos);
                 shadowPos += lightDir * shadowDist;
-                if (shadowDist < 0.01) {
-                    inShadow = true;
+                if (shadowDist < 0.001) {
+                    brightness *= 0.2;
+                    break;
+                }
+                if (shadowDist > 100.0) {
                     break;
                 }
             }
-
-            if (inShadow)
-                brightness *= 0.4;
 
             color = vec4(brightness, brightness, brightness, 1.0);
             break;
@@ -143,7 +151,7 @@ void main() {
 
         if (dist > 100.0) {
             if (dot(rayDir, lightDir) > 0.999)
-                color = vec4(1.0, 1.0, 0.0, 1.0);
+                color = vec4(1.0);
             break;
         }
     }

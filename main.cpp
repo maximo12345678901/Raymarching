@@ -25,6 +25,8 @@ int main() {
     double blendStrength = 1.0;
     double mandelPower = 2.0;
     double mandelIterations = 10.0;
+    double glowStrength = 0.05;
+    double rayBendStrength = 0.1;
     Background background(sf::Color(20, 20, 20), sf::Vector2f(10, 10), sf::Vector2f(500, 100));
 
     sf::Font font("font.tff");
@@ -33,7 +35,7 @@ int main() {
     Slider blendSlider(
     blendStrength,
     0.0001, 10.0,
-    sf::Vector2f(10.f, 50.f),
+    sf::Vector2f(10.f, 75.f),
     490.f,
     sf::Color(100, 100, 100),
     sf::Color::White,
@@ -47,7 +49,7 @@ int main() {
     Slider mandelPowerSlider(
     mandelPower,
     1.0, 4.0,
-    sf::Vector2f(10.f, 100.f),
+    sf::Vector2f(10.f, 150.f),
     490.f,
     sf::Color(100, 100, 100),
     sf::Color::White,
@@ -61,16 +63,47 @@ int main() {
     Slider iterationSlider(
     mandelIterations,
     5.0, 200.0,
-    sf::Vector2f(10.f, 150.f),
+    sf::Vector2f(10.f, 225.f),
     490.f,
     sf::Color(100, 100, 100),
     sf::Color::White,
     4.f,
     8.f,
-    2,
+    0,
     font,
     "Mandelbulb iterations"
     );
+    // Glow slider
+    Slider glowSlider(
+    glowStrength,
+    0.0001, 1.0,
+    sf::Vector2f(10.f, 300.f),
+    490.f,
+    sf::Color(100, 100, 100),
+    sf::Color::White,
+    4.f,
+    8.f,
+    0,
+    font,
+    "glow strength"
+    );
+    // Ray bend strength slider
+        // Glow slider
+    Slider rayBendStrengthSlider(
+    rayBendStrength,
+    0.0, 1.0,
+    sf::Vector2f(10.f, 375.f),
+    490.f,
+    sf::Color(100, 100, 100),
+    sf::Color::White,
+    4.f,
+    8.f,
+    0,
+    font,
+    "ray bend strength"
+    );
+
+
 
     bool isShowingUI = true;
     sf::RenderWindow window(sf::VideoMode({windowWidth, windowHeight}), "reymarc");
@@ -95,6 +128,8 @@ int main() {
             blendSlider.HandleEvent(*event, window);
             mandelPowerSlider.HandleEvent(*event, window);
             iterationSlider.HandleEvent(*event, window);
+            glowSlider.HandleEvent(*event, window);
+            rayBendStrengthSlider.HandleEvent(*event, window);
         }
 
         Vector3 forward = Vector3::getForward(camRot);
@@ -142,6 +177,8 @@ int main() {
         shader.setUniform("uBlendStrength", static_cast<float>(blendStrength));
         shader.setUniform("Iterations", static_cast<int>(mandelIterations));
         shader.setUniform("Power", static_cast<float>(mandelPower));
+        shader.setUniform("GlowStrength", static_cast<float>(glowStrength));
+        shader.setUniform("RayBendStrength", static_cast<float>(rayBendStrength));
 
         renderTexture.clear();
         renderTexture.draw(quad, &shader);
@@ -154,6 +191,8 @@ int main() {
             blendSlider.Draw(window);
             mandelPowerSlider.Draw(window);
             iterationSlider.Draw(window);
+            glowSlider.Draw(window);
+            rayBendStrengthSlider.Draw(window);
         }
         window.display();
     }
