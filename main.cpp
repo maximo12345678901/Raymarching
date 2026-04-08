@@ -25,10 +25,11 @@ int main() {
     double blendStrength = 1.0;
     double mandelPower = 2.0;
     double mandelIterations = 10.0;
-    double glowStrength = 0.05;
-    double rayBendStrength = 0.1;
-    Background background(sf::Color(20, 20, 20), sf::Vector2f(10, 10), sf::Vector2f(500, 100));
-
+    double glowStrength = 0.15;
+    double rayBendStrength = 0.0;
+    bool doOutlineShading = false;
+    bool drawMandelBulb = false;
+    
     sf::Font font("font.tff");
     
     // Blend strength slider
@@ -83,12 +84,12 @@ int main() {
     sf::Color::White,
     4.f,
     8.f,
-    0,
+    2,
     font,
     "glow strength"
     );
+    
     // Ray bend strength slider
-        // Glow slider
     Slider rayBendStrengthSlider(
     rayBendStrength,
     0.0, 1.0,
@@ -98,11 +99,28 @@ int main() {
     sf::Color::White,
     4.f,
     8.f,
-    0,
+    2,
     font,
     "ray bend strength"
     );
 
+    CheckBox shadingTypeToggle(
+    doOutlineShading,
+    sf::Vector2f(10.f, 450.f),
+    50.f,
+    sf::Color(50, 50, 50),
+    sf::Color::White,
+    font,
+    "Toggle shading type");
+
+    CheckBox mandelBulbToggle(
+    drawMandelBulb,
+    sf::Vector2f(10.f, 510.f),
+    50.f,
+    sf::Color(50, 50, 50),
+    sf::Color::White,
+    font,
+    "Draw mandelbulb");
 
 
     bool isShowingUI = true;
@@ -130,6 +148,8 @@ int main() {
             iterationSlider.HandleEvent(*event, window);
             glowSlider.HandleEvent(*event, window);
             rayBendStrengthSlider.HandleEvent(*event, window);
+            shadingTypeToggle.CheckIfPressed(window);
+            mandelBulbToggle.CheckIfPressed(window);
         }
 
         Vector3 forward = Vector3::getForward(camRot);
@@ -179,6 +199,8 @@ int main() {
         shader.setUniform("Power", static_cast<float>(mandelPower));
         shader.setUniform("GlowStrength", static_cast<float>(glowStrength));
         shader.setUniform("RayBendStrength", static_cast<float>(rayBendStrength));
+        shader.setUniform("doOutlineShading", doOutlineShading);
+        shader.setUniform("drawMandelBulb", drawMandelBulb);
 
         renderTexture.clear();
         renderTexture.draw(quad, &shader);
@@ -187,12 +209,13 @@ int main() {
         window.clear();
         window.draw(sprite);
         if (isShowingUI) {
-            background.Draw(window);
             blendSlider.Draw(window);
             mandelPowerSlider.Draw(window);
             iterationSlider.Draw(window);
             glowSlider.Draw(window);
             rayBendStrengthSlider.Draw(window);
+            shadingTypeToggle.Draw(window);
+            mandelBulbToggle.Draw(window);
         }
         window.display();
     }
